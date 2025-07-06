@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Furniture Scene Renderer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .upload-section {
+            margin-bottom: 30px;
+        }
+
+        .upload-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .upload-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+
+        .upload-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .upload-btn:active {
+            transform: translateY(0);
+        }
+
+        .upload-area {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #f9fafb;
+        }
+
+        .upload-area:hover {
+            border-color: #3b82f6;
+            background: #f0f9ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #3b82f6;
+            background: #dbeafe;
+        }
+
+        .upload-text {
+            color: #6b7280;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            color: #9ca3af;
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .preview-section {
+            margin-bottom: 30px;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            align-items: center;
+        }
+
+        .control-group {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 16px;
+            background: white;
+            color: #374151;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .generate-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .generate-btn:hover:not(:disabled) {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .generate-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            margin-top: 30px;
+        }
+
+        .result-image {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+            display: none;
+        }
+
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border: 1px solid #fecaca;
+            display: none;
+        }
+
+        .success {
+            background: #f0fdf4;
+            color: #16a34a;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border: 1px solid #bbf7d0;
+            display: none;
+        }
+
+        .metadata {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #64748b;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Furniture Scene Renderer</h1>
+        
+        <div class="upload-section">
+            <div class="upload-buttons">
+                <button type="button" class="upload-btn" id="galleryBtn">
+                    📁 Galerij
+                </button>
+                <button type="button" class="upload-btn" id="cameraBtn">
+                    📸 Camera
+                </button>
+            </div>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-text">Klik op Galerij of Camera om een foto te maken</div>
+                <div class="upload-subtext">PNG, JPG tot 10MB</div>
+                <input type="file" id="fileInput" accept="image/*" />
+                <input type="file" id="cameraInput" accept="image/*" capture="environment" />
+            </div>
+        </div>
+
+        <div class="preview-section">
+            <img id="previewImage" class="preview-image" />
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="styleSelect">Kamerstijl:</label>
+                <select id="styleSelect">
+                    <option value="studio_wit">Studio Wit</option>
+                    <option value="scandinavisch">Scandinavisch</option>
+                    <option value="modern_minimaal">Modern Minimaal</option>
+                    <option value="warm_industrieel">Warm Industrieel</option>
+                    <option value="japandi">Japandi</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="generate-btn" id="generateBtn">Genereer Scene</button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Genereren van je scene...</div>
+        </div>
+
+        <div class="error" id="error"></div>
+        <div class="success" id="success"></div>
+
+        <div class="results">
+            <img id="resultImage" class="result-image" />
+            <div class="metadata" id="metadata"></div>
+        </div>
+    </div>
+
+    <script>
+        let uploadedImage = null;
+        let currentSceneData = null;
+
+        // DOM elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const cameraInput = document.getElementById('cameraInput');
+        const galleryBtn = document.getElementById('galleryBtn');
+        const cameraBtn = document.getElementById('cameraBtn');
+        const previewImage = document.getElementById('previewImage');
+        const generateBtn = document.getElementById('generateBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const success = document.getElementById('success');
+        const resultImage = document.getElementById('resultImage');
+        const metadata = document.getElementById('metadata');
+        const styleSelect = document.getElementById('styleSelect');
+
+        // Upload handling
+        galleryBtn.addEventListener('click', () => fileInput.click());
+        cameraBtn.addEventListener('click', () => cameraInput.click());
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileUpload(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        cameraInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        function handleFileUpload(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('Selecteer een geldige afbeelding');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                showError('Afbeelding te groot (max 10MB)');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImage = e.target.result;
+                previewImage.src = uploadedImage;
+                previewImage.style.display = 'block';
+                updateGenerateButton();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateGenerateButton() {
+            const hasImage = uploadedImage !== null;
+            generateBtn.disabled = !hasImage;
+        }
+
+        generateBtn.addEventListener('click', async () => {
+            if (!uploadedImage) {
+                showError('Upload een afbeelding');
+                return;
+            }
+
+            await generateScene();
+        });
+
+        async function generateScene() {
+            const selectedStyle = styleSelect.value;
+            
+            showLoading();
+            hideMessages();
+            
+            try {
+                // Convert base64 to blob for FormData
+                const base64Data = uploadedImage.split(',')[1];
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'image/jpeg' });
+                
+                // Create FormData
+                const formData = new FormData();
+                formData.append('image', blob, 'furniture.jpg');
+                formData.append('style', selectedStyle);
+                
+                // Call our backend API instead of OpenAI directly
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'API request failed');
+                }
+
+                const data = await response.json();
+                
+                // Store scene data for potential future use
+                currentSceneData = data.sceneData;
+
+                // Show result
+                resultImage.src = data.imageUrl;
+                resultImage.style.display = 'block';
+                
+                // Show metadata
+                metadata.innerHTML = `
+                    <strong>Stijl:</strong> ${data.metadata.style} <br>
+                    <strong>Gegenereerd:</strong> ${data.metadata.generatedAt} <br>
+                    <strong>Scene data:</strong> Opgeslagen voor detail shots
+                `;
+                metadata.style.display = 'block';
+
+                showSuccess('Scene succesvol gegenereerd!');
+                
+            } catch (err) {
+                console.error('Generation error:', err);
+                showError(`Fout bij genereren: ${err.message}`);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showLoading() {
+            loading.style.display = 'block';
+            generateBtn.disabled = true;
+        }
+
+        function hideLoading() {
+            loading.style.display = 'none';
+            updateGenerateButton();
+        }
+
+        function showError(message) {
+            error.textContent = message;
+            error.style.display = 'block';
+            success.style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            success.textContent = message;
+            success.style.display = 'block';
+            error.style.display = 'none';
+        }
+
+        function hideMessages() {
+            error.style.display = 'none';
+            success.style.display = 'none';
+        }
+
+        // Initialize
+        updateGenerateButton();
+    </script>
+</body>
+</html>
