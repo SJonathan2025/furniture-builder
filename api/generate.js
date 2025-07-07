@@ -1,39 +1,39 @@
-// api/generate.js - Vercel serverless function
+// api/generate.js - Vercel serverless function with FLUX
 import formidable from 'formidable';
 import fs from 'fs';
 
-// Scene configurations
+// Scene configurations optimized for FLUX
 const SCENE_CONFIGS = {
     studio_wit: {
-        prompt: "professional product photography in a clean white studio setting with soft even lighting",
+        prompt: "Place this furniture in a clean white photography studio with soft professional lighting, keep the furniture design and colors identical, minimal white background, product photography style",
         lighting: "soft studio lighting",
         background: "clean white backdrop",
         camera: "product photography angle",
         mood: "clean and minimal"
     },
     scandinavisch: {
-        prompt: "cozy Scandinavian living room with natural wood, white walls, minimal decor, warm natural lighting",
+        prompt: "Place this furniture in a cozy Scandinavian living room with natural wood elements, white walls, minimal Nordic decor, warm natural lighting, keep the furniture design identical",
         lighting: "warm natural window light",
         background: "scandinavian interior with white walls and wood accents",
         camera: "lifestyle photography angle",
         mood: "cozy and natural"
     },
     modern_minimaal: {
-        prompt: "modern minimalist living room with clean lines, neutral colors, geometric shapes, bright lighting",
+        prompt: "Place this furniture in a modern minimalist living room with clean lines, neutral colors, contemporary architecture, bright natural lighting, keep the furniture design identical",
         lighting: "bright clean lighting",
         background: "minimalist interior with clean lines",
         camera: "architectural photography angle",
         mood: "sleek and minimal"
     },
     warm_industrieel: {
-        prompt: "warm industrial loft with exposed brick, metal accents, Edison bulbs, warm ambient lighting",
+        prompt: "Place this furniture in a warm industrial loft with exposed brick walls, metal accents, Edison bulb lighting, urban atmosphere, keep the furniture design identical",
         lighting: "warm ambient lighting with Edison bulbs",
         background: "industrial loft with exposed brick and metal",
         camera: "atmospheric photography angle",
         mood: "warm and industrial"
     },
     japandi: {
-        prompt: "Japandi style room with natural materials, neutral tones, plants, zen aesthetics, soft lighting",
+        prompt: "Place this furniture in a Japandi style room with natural materials, neutral earth tones, plants, zen minimalist aesthetics, soft natural lighting, keep the furniture design identical",
         lighting: "soft natural lighting",
         background: "japandi interior with natural materials and plants",
         camera: "zen lifestyle photography angle",
@@ -88,56 +88,97 @@ export default async function handler(req, res) {
         // Read and convert image to base64
         const imageBuffer = fs.readFileSync(imageFile.filepath);
         const base64Image = imageBuffer.toString('base64');
-        const mimeType = imageFile.mimetype || 'image/jpeg';
+        const dataUrl = `data:${imageFile.mimetype || 'image/jpeg'};base64,${base64Image}`;
 
-        console.log(`Generating scene for style: ${style}`);
+        console.log(`Generating scene with FLUX for style: ${style}`);
 
-        // Call OpenAI DALL-E 3 API
-        const openaiResponse = await fetch('https://api.openai.com/v1/images/generations', {
+        // Call Replicate FLUX API
+        const replicateResponse = await fetch('https://api.replicate.com/v1/predictions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: "dall-e-3",
-                prompt: `Take this furniture piece and place it naturally in a ${config.prompt}. The furniture should be the main focal point and fit perfectly in the space. Make it look like professional interior design photography with realistic lighting and proportions. High quality, photorealistic, 4K resolution.`,
-                n: 1,
-                size: "1024x1024",
-                quality: "standard",
-                response_format: "url"
+                version: "black-forest-labs/flux-dev",
+                input: {
+                    image: dataUrl,
+                    prompt: config.prompt,
+                    num_inference_steps: 28,
+                    guidance_scale: 3.5,
+                    aspect_ratio: "1:1"
+                }
             })
         });
 
-        if (!openaiResponse.ok) {
-            const errorData = await openaiResponse.json();
-            console.error('OpenAI API Error:', errorData);
-            return res.status(openaiResponse.status).json({ 
-                error: errorData.error?.message || 'Failed to generate image' 
+        if (!replicateResponse.ok) {
+            const errorData = await replicateResponse.json();
+            console.error('Replicate API Error:', errorData);
+            return res.status(replicateResponse.status).json({ 
+                error: errorData.detail || 'Failed to generate image' 
             });
         }
 
-        const openaiData = await openaiResponse.json();
+        const prediction = await replicateResponse.json();
         
+        // Poll for completion
+        let result = prediction;
+        let attempts = 0;
+        const maxAttempts = 60; // 5 minutes max
+
+        while (result.status !== 'succeeded' && result.status !== 'failed' && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+            
+            const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${result.id}`, {
+                headers: {
+                    'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}`,
+                }
+            });
+
+            if (pollResponse.ok) {
+                result = await pollResponse.json();
+            }
+            attempts++;
+        }
+
+        if (result.status === 'failed') {
+            console.error('FLUX generation failed:', result.error);
+            return res.status(500).json({ 
+                error: 'Image generation failed',
+                details: result.error 
+            });
+        }
+
+        if (result.status !== 'succeeded') {
+            console.error('FLUX generation timed out');
+            return res.status(500).json({ 
+                error: 'Image generation timed out' 
+            });
+        }
+
+        // Get the generated image URL
+        const imageUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+
         // Prepare response with scene metadata
         const sceneData = {
             style: style,
             config: config,
             timestamp: new Date().toISOString(),
-            imageUrl: openaiData.data[0].url,
-            revised_prompt: openaiData.data[0].revised_prompt || null
+            imageUrl: imageUrl,
+            model: 'flux-dev'
         };
 
-        console.log(`Scene generated successfully for style: ${style}`);
+        console.log(`Scene generated successfully with FLUX for style: ${style}`);
         
         res.json({
             success: true,
-            imageUrl: openaiData.data[0].url,
+            imageUrl: imageUrl,
             sceneData: sceneData,
             metadata: {
                 style: style.replace('_', ' '),
                 generatedAt: new Date().toLocaleString('nl-NL'),
-                prompt: config.prompt
+                prompt: config.prompt,
+                model: 'FLUX-dev'
             }
         });
 
